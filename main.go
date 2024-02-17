@@ -1,7 +1,8 @@
 package main
 
-import "fmt"
+import "github.com/yuichi10/edinet_search/cmd"
+
 
 func main() {
-	fmt.Println("Hello world")
+	cmd.Execute()
 }

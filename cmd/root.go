@@ -5,9 +5,14 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
+
+
 func newRootCmd() *cobra.Command {
+	cobra.OnInitialize(initConfig)
+
 	c := &cobra.Command{
 		Use: "edinet",
 		Short: "edinetから各会社の平均年収等を取ってきて表示します。",
@@ -15,7 +20,18 @@ func newRootCmd() *cobra.Command {
 			fmt.Println("hello world")
 		},
 	}
+
+	c.PersistentFlags().StringP("token", "t", "", "edinet api token. This cmd using v2")
+	viper.SetDefault("EDINET_API_TOKEN","")
+	viper.BindEnv("api.token", "EDINET_API_TOKEN")
+
+	c.AddCommand(NewCreateDBCmd())
+
 	return c
+}
+
+func initConfig() {
+	viper.AutomaticEnv()
 }
 
 func Execute() {
