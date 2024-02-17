@@ -13,15 +13,15 @@ var db *gorm.DB
 const dbName = "company.db"
 
 type Documents struct {
-	DocID               string `gorm:"primaryKey"`
-	SecCode             string
-	FilerName           string `gorm:"index"`
-	DocDescription      string
-	SubmitDatetime      string
-	AvgAge              string
-	AvgYearOfService    string
-	AvgAnnualSalary     string `gorm:"index"`
-	EmployeeInformation string
+	DocID               string `gorm:"primaryKey"` // ドキュメントID
+	SecCode             string // コード
+	FilerName           string `gorm:"index"` // 上げた人・会社
+	DocDescription      string // 見ている資料の情報
+	SubmitDatetime      string // 更新された時期
+	AvgAge              string // 働いている人の平均年齢
+	AvgYearOfService    string // 働いている人が大体何年間働いているか
+	AvgAnnualSalary     string `gorm:"index"` // 平均年収
+	EmployeeInformation string // 授業員情報
 }
 
 func DeleteDB() error {
