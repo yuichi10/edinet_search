@@ -26,7 +26,7 @@ update_dateテーブル。
 - end_date: date
 
 
-documents_metaテーブル
+documentsテーブル
 実際にedinetから取得してきたドキュメントの情報を保管。ドキュメントと行っているが、有価証券の情報だけを保管する予定.
 docIDをprimayにしておけば良さげ。
 ordinanceCodeが010、form_codeが030000のデータのみをまずは取るようにしてみる。
@@ -35,6 +35,11 @@ ordinanceCodeが010、form_codeが030000のデータのみをまずは取るよ�
 - filerName
 - submitDateTime
 - docDescription
+
+実際にファイルから取得したデータをDBに保存するような機能がほしい。
+というか最初にすべてのmetadataを取ってきたときについでにすべてのデータをパースしてDBにデータを追加すれば良さそう。
+securities テーブル
+
 */
 
 const EDINET_API_ENDPOINT = "https://api.edinet-fsa.go.jp/api/v2/documents.json"
@@ -103,10 +108,9 @@ func initDB() (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("sqliteのファイルを参照するのに失敗しました。 %s", err.Error())
 	}
-	defer db.Close()
 
 	sqlStmt := `
-			create table documents (docID text not null primary key, secCode text, filerName text, docDescription text, submitDateTime text);
+			create table documents (doc_id text not null primary key, sec_code text, filer_name text, doc_description text, submit_datetime text);
 			`
 	_, err = db.Exec(sqlStmt)
 	if err != nil {
@@ -130,6 +134,71 @@ func parseParams() (inputParams, error) {
 	return params, nil
 }
 
+func getDocument(url string) (*Documents, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("ドキュメントデータの取得に失敗しました %s", err)
+
+	}
+	defer resp.Body.Close()
+	docs := Documents{}
+	decoder := json.NewDecoder(resp.Body)
+	if err := decoder.Decode(&docs); err != nil {
+		return nil, fmt.Errorf("取得したドキュメントデータのパースに失敗しました %s", err)
+	}
+	return &docs, nil
+}
+
+func insertDocumentData(db *sql.DB, docs *Documents) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare("insert into documents(doc_id, sec_code, filer_name, doc_description, submit_datetime) values(?, ?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, doc := range docs.Results {
+		if doc.OrdinanceCode == "010" && doc.FormCode == "030000" {
+			fmt.Print(".")
+			_, err = stmt.Exec(doc.DocID, doc.SecCode, doc.FilerName, doc.DocDescription, doc.SubmitDateTime)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func insertSecuritiesData(p inputParams, db *sql.DB) {
+	parsedURL, err := url.Parse(EDINET_API_ENDPOINT)
+	if err != nil {
+		log.Fatal(err)
+	}
+	params := url.Values{}
+	params.Add("Subscription-Key", viper.GetString("api.token"))
+	params.Add("type", "2")
+	for d := p.startDate; !d.After(p.endDate); d = d.AddDate(0, 0, 1) {
+		params.Set("date", d.Format("2006-01-02"))
+		parsedURL.RawQuery = params.Encode()
+		docs, err := getDocument(parsedURL.String())
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		err = insertDocumentData(db, docs)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
+
+}
+
 func NewCreateDBCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "createdb",
@@ -140,38 +209,14 @@ func NewCreateDBCmd() *cobra.Command {
 				log.Fatal(err.Error())
 			}
 			fmt.Println("空のDBを作成します。")
-			_, err = initDB()
+			db, err := initDB()
 			if err != nil {
 				log.Fatal(err.Error())
 			}
+			defer db.Close()
 
-			parsedURL, err := url.Parse(EDINET_API_ENDPOINT)
-			if err != nil {
-				log.Fatal(err)
-			}
-			params := url.Values{}
-			params.Add("Subscription-Key", viper.GetString("api.token"))
-			params.Add("type", "2")
-			for d := p.startDate; !d.After(p.endDate); d = d.AddDate(0, 0, 1) {
-				params.Set("date", d.Format("2006-01-02"))
-				parsedURL.RawQuery = params.Encode()
-				resp, err := http.Get(parsedURL.String())
-				if err != nil {
-					log.Fatal(err)
-				}
-				defer resp.Body.Close()
-				docs := Documents{}
-				decoder := json.NewDecoder(resp.Body)
-				if err := decoder.Decode(&docs); err != nil {
-					log.Fatal(err)
-				}
-				fmt.Println("以下の日付のデータだよー")
-				fmt.Println(d.String())
-				fmt.Printf("%v", docs)
-				fmt.Println()
-				fmt.Println()
-			}
-
+			fmt.Println("ドキュメントの情報をDBに書き込んでいます.")
+			insertSecuritiesData(p, db)
 		},
 	}
 
