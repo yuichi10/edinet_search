@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/yuichi10/edinet_search/cmd/createdb"
 )
 
 
@@ -27,7 +28,7 @@ func newRootCmd() *cobra.Command {
 	viper.SetDefault("EDINET_API_TOKEN","")
 	viper.BindEnv("api.token", "EDINET_API_TOKEN")
 
-	c.AddCommand(NewCreateDBCmd())
+	c.AddCommand(createdb.NewCreateDBCmd())
 
 	return c
 }

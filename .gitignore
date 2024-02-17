@@ -24,3 +24,4 @@ edinet
 .DS_Store
 .envrc
 XBRL_TO_CSV*
+company.db
