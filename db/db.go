@@ -1,12 +1,15 @@
 package db
 
 import (
+	"fmt"
 	"log"
 	"os"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
+
+// どこかでエラー処理ちゃんといれる。
 
 var db *gorm.DB
 
@@ -42,4 +45,20 @@ func CreateDocumentTable() {
 
 func InsertDocument(d Documents) {
 	db.Create(d)
+}
+
+func GetDocuments(filerNames []string) ([]Documents, error) {
+	var docs []Documents
+
+	query := db.Model(&Documents{})
+	for _, filerName := range filerNames {
+		query.Or("filer_name LIKE ?", fmt.Sprintf("%%%s%%", filerName))
+	}
+
+	result := query.Find(&docs)
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("ドキュメントの一覧取得失敗 %s", result.Error)
+	}
+	return docs, nil
 }
