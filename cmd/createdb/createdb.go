@@ -1,18 +1,27 @@
 package createdb
 
 import (
+	"archive/zip"
+	"bufio"
+	"bytes"
 	"database/sql"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/transform"
 )
 
 /*
@@ -38,21 +47,64 @@ ordinanceCodeが010、form_codeが030000のデータのみをまずは取るよ�
 
 実際にファイルから取得したデータをDBに保存するような機能がほしい。
 というか最初にすべてのmetadataを取ってきたときについでにすべてのデータをパースしてDBにデータを追加すれば良さそう。
+とりあえず最初はすべてのデータを保存するようにしてしまう。
 securities テーブル
+doc_id 上のテーブルとの紐づけ(実際一つのテーブルに入れてしまってもいいのかもしれない。とりあえずのものだし、別テーブルで作ってしまう。)
+number_of_employees 従業員数（人）
+avg_age 平均年齢（歳）
+avg_years_of_service 平均勤続年数（年）
+avg_annual_salary 平均年間給与（円）
+employee_information_text InformationAboutEmployeesTextBlockの情報をそのままいれる。
 
+TODO
+どこかで売上高と、経営利益を取得して、利益率も表示させたい。
 */
 
-const EDINET_API_ENDPOINT = "https://api.edinet-fsa.go.jp/api/v2/documents.json"
+const EDINET_DOCUMENT_META_API_ENDPOINT = "https://api.edinet-fsa.go.jp/api/v2/documents.json"
+const EDINET_DOCUMENT_API_ENDPOINT = "https://api.edinet-fsa.go.jp/api/v2/documents/"
 const DB_NAME = "company.db"
 
 // args
 var strStartDate, strEndDate string
+var preserveSecurities bool
 
 var startDate, endDate time.Time
 
 type inputParams struct {
 	startDate time.Time
 	endDate   time.Time
+}
+
+type Document struct {
+	SeqNumber            int         `json:"seqNumber"`
+	DocID                string      `json:"docID"`
+	EdinetCode           string      `json:"edinetCode"`
+	SecCode              string      `json:"secCode"`
+	Jcn                  string      `json:"JCN"`
+	FilerName            string      `json:"filerName"`
+	FundCode             interface{} `json:"fundCode"`
+	OrdinanceCode        string      `json:"ordinanceCode"`
+	FormCode             string      `json:"formCode"`
+	DocTypeCode          string      `json:"docTypeCode"`
+	PeriodStart          interface{} `json:"periodStart"`
+	PeriodEnd            interface{} `json:"periodEnd"`
+	SubmitDateTime       string      `json:"submitDateTime"`
+	DocDescription       string      `json:"docDescription"`
+	IssuerEdinetCode     interface{} `json:"issuerEdinetCode"`
+	SubjectEdinetCode    interface{} `json:"subjectEdinetCode"`
+	SubsidiaryEdinetCode interface{} `json:"subsidiaryEdinetCode"`
+	CurrentReportReason  interface{} `json:"currentReportReason"`
+	ParentDocID          interface{} `json:"parentDocID"`
+	OpeDateTime          interface{} `json:"opeDateTime"`
+	WithdrawalStatus     string      `json:"withdrawalStatus"`
+	DocInfoEditStatus    string      `json:"docInfoEditStatus"`
+	DisclosureStatus     string      `json:"disclosureStatus"`
+	XbrlFlag             string      `json:"xbrlFlag"`
+	PdfFlag              string      `json:"pdfFlag"`
+	AttachDocFlag        string      `json:"attachDocFlag"`
+	EnglishDocFlag       string      `json:"englishDocFlag"`
+	CsvFlag              string      `json:"csvFlag"`
+	LegalStatus          string      `json:"legalStatus"`
 }
 
 type Documents struct {
@@ -69,37 +121,15 @@ type Documents struct {
 		Status          string `json:"status"`
 		Message         string `json:"message"`
 	} `json:"metadata"`
-	Results []struct {
-		SeqNumber            int         `json:"seqNumber"`
-		DocID                string      `json:"docID"`
-		EdinetCode           string      `json:"edinetCode"`
-		SecCode              string      `json:"secCode"`
-		Jcn                  string      `json:"JCN"`
-		FilerName            string      `json:"filerName"`
-		FundCode             interface{} `json:"fundCode"`
-		OrdinanceCode        string      `json:"ordinanceCode"`
-		FormCode             string      `json:"formCode"`
-		DocTypeCode          string      `json:"docTypeCode"`
-		PeriodStart          interface{} `json:"periodStart"`
-		PeriodEnd            interface{} `json:"periodEnd"`
-		SubmitDateTime       string      `json:"submitDateTime"`
-		DocDescription       string      `json:"docDescription"`
-		IssuerEdinetCode     interface{} `json:"issuerEdinetCode"`
-		SubjectEdinetCode    interface{} `json:"subjectEdinetCode"`
-		SubsidiaryEdinetCode interface{} `json:"subsidiaryEdinetCode"`
-		CurrentReportReason  interface{} `json:"currentReportReason"`
-		ParentDocID          interface{} `json:"parentDocID"`
-		OpeDateTime          interface{} `json:"opeDateTime"`
-		WithdrawalStatus     string      `json:"withdrawalStatus"`
-		DocInfoEditStatus    string      `json:"docInfoEditStatus"`
-		DisclosureStatus     string      `json:"disclosureStatus"`
-		XbrlFlag             string      `json:"xbrlFlag"`
-		PdfFlag              string      `json:"pdfFlag"`
-		AttachDocFlag        string      `json:"attachDocFlag"`
-		EnglishDocFlag       string      `json:"englishDocFlag"`
-		CsvFlag              string      `json:"csvFlag"`
-		LegalStatus          string      `json:"legalStatus"`
-	} `json:"results"`
+	Results []Document `json:"results"`
+}
+
+type SecuritiesInfo struct {
+	NumberOfEmployees   string
+	AvgAge              string
+	AvgYearOfService    string
+	AvgAnnualSalary     string
+	EmployeeInformation string
 }
 
 func initDB() (*sql.DB, error) {
@@ -110,7 +140,7 @@ func initDB() (*sql.DB, error) {
 	}
 
 	sqlStmt := `
-			create table documents (doc_id text not null primary key, sec_code text, filer_name text, doc_description text, submit_datetime text);
+			create table documents (doc_id text not null primary key, sec_code text, filer_name text, doc_description text, submit_datetime text, avg_age text, avg_year_of_service text, avg_annual_salary text, employee_information text);
 			`
 	_, err = db.Exec(sqlStmt)
 	if err != nil {
@@ -134,8 +164,17 @@ func parseParams() (inputParams, error) {
 	return params, nil
 }
 
-func getDocument(url string) (*Documents, error) {
-	resp, err := http.Get(url)
+func getDocumentInfo(d time.Time) (*Documents, error) {
+	parsedURL, err := url.Parse(EDINET_DOCUMENT_META_API_ENDPOINT)
+	if err != nil {
+		log.Fatal(err)
+	}
+	params := url.Values{}
+	params.Add("Subscription-Key", viper.GetString("api.token"))
+	params.Add("type", "2")
+	params.Add("date", d.Format("2006-01-02"))
+	parsedURL.RawQuery = params.Encode()
+	resp, err := http.Get(parsedURL.String())
 	if err != nil {
 		return nil, fmt.Errorf("ドキュメントデータの取得に失敗しました %s", err)
 
@@ -149,54 +188,120 @@ func getDocument(url string) (*Documents, error) {
 	return &docs, nil
 }
 
-func insertDocumentData(db *sql.DB, docs *Documents) error {
-	tx, err := db.Begin()
+func getDocument(doc *Document) (*SecuritiesInfo, error) {
+	docParsedURL, err := url.Parse(EDINET_DOCUMENT_API_ENDPOINT)
 	if err != nil {
-		return err
+		// return nil, fmt.Errorf("ドキュメントURLのパースに失敗しました %s", err)
+		log.Fatalln(err)
 	}
-	stmt, err := tx.Prepare("insert into documents(doc_id, sec_code, filer_name, doc_description, submit_datetime) values(?, ?, ?, ?, ?)")
+	docParsedURL.Path = path.Join(docParsedURL.Path, doc.DocID)
+	params := url.Values{}
+	params.Add("Subscription-Key", viper.GetString("api.token"))
+	params.Add("type", "5")
+	docParsedURL.RawQuery = params.Encode()
+	resp, err := http.Get(docParsedURL.String())
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("ドキュメントの取得に失敗しました %s", err)
 	}
-	defer stmt.Close()
-	for _, doc := range docs.Results {
-		if doc.OrdinanceCode == "010" && doc.FormCode == "030000" {
-			fmt.Print(".")
-			_, err = stmt.Exec(doc.DocID, doc.SecCode, doc.FilerName, doc.DocDescription, doc.SubmitDateTime)
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("docID: %s, 会社名: %s のドキュメントファイルの取得に失敗しました", doc.DocID, doc.FilerName)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("ドキュメントファイルの読み込みに失敗しました %s", err)
+	}
+
+	zipReader, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		return nil, fmt.Errorf("docID: %s, 会社名: %s のドキュメントファイルの解答に失敗しました %s", doc.DocID, doc.FilerName, err)
+	}
+
+	securInfo := &SecuritiesInfo{}
+	for _, file := range zipReader.File {
+		if strings.HasPrefix(file.Name, "XBRL_TO_CSV/jpcrp") {
+			f, err := file.Open()
 			if err != nil {
-				return err
+				return nil, fmt.Errorf("zip内のファイルの読み込みに失敗しました。 %s", err)
+			}
+			defer f.Close()
+			decoder := unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder()
+			reader := csv.NewReader(transform.NewReader(bufio.NewReader(f), decoder))
+			reader.Comma = '\t'
+			for {
+				record, err := reader.Read()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					fmt.Printf("CSVファイルを読むのに失敗しました。 %s\n", err)
+					break
+				}
+
+				switch record[0] {
+				case "jpcrp_cor:AverageLengthOfServiceYearsInformationAboutReportingCompanyInformationAboutEmployees":
+					// 平均継続年数
+					securInfo.AvgYearOfService = record[len(record)-1]
+				case "jpcrp_cor:AverageAgeYearsInformationAboutReportingCompanyInformationAboutEmployees":
+					// 平均年齢
+					securInfo.AvgAge = record[len(record)-1]
+				case "jpcrp_cor:AverageAnnualSalaryInformationAboutReportingCompanyInformationAboutEmployees":
+					// 平均年間給与
+					securInfo.AvgAnnualSalary = record[len(record)-1]
+				case "jpcrp_cor:InformationAboutEmployeesTextBlock":
+					securInfo.EmployeeInformation = record[len(record)-1]
+				}
 			}
 		}
 	}
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-	return nil
+
+	return securInfo, nil
 }
 
 func insertSecuritiesData(p inputParams, db *sql.DB) {
-	parsedURL, err := url.Parse(EDINET_API_ENDPOINT)
-	if err != nil {
-		log.Fatal(err)
-	}
-	params := url.Values{}
-	params.Add("Subscription-Key", viper.GetString("api.token"))
-	params.Add("type", "2")
 	for d := p.startDate; !d.After(p.endDate); d = d.AddDate(0, 0, 1) {
-		params.Set("date", d.Format("2006-01-02"))
-		parsedURL.RawQuery = params.Encode()
-		docs, err := getDocument(parsedURL.String())
+		docs, err := getDocumentInfo(d)
 		if err != nil {
-			log.Fatalln(err)
+			fmt.Printf("%s のデータの取得に失敗しました。 %s", d, err)
+			continue
 		}
-
-		err = insertDocumentData(db, docs)
+		tx, err := db.Begin()
 		if err != nil {
-			log.Fatalln(err)
+			fmt.Printf("%s のDBの開始に取得に失敗しました。 %s", d, err)
+			tx.Rollback()
+			continue
+		}
+		stmt, err := tx.Prepare("insert into documents(doc_id, sec_code, filer_name, doc_description, submit_datetime, avg_age, avg_year_of_service, avg_annual_salary, employee_information) values(?, ?, ?, ?, ?, ?, ?, ?, ?)")
+		if err != nil {
+			fmt.Printf("%s のDBのクエリの準備に失敗しました。 %s", d, err)
+			tx.Rollback()
+			continue
+		}
+		defer stmt.Close()
+		for _, doc := range docs.Results {
+			if doc.OrdinanceCode == "010" && doc.FormCode == "030000" {
+				fmt.Print(".")
+				docInfo, err := getDocument(&doc)
+				if err != nil {
+					fmt.Printf("docID: %s, 会社名: %s 有価証券情報の取得に失敗しました。 %s", doc.DocID, doc.FilerName, err)
+					tx.Rollback()
+					continue
+				}
+				_, err = stmt.Exec(doc.DocID, doc.SecCode, doc.FilerName, doc.DocDescription, doc.SubmitDateTime, docInfo.AvgAge, docInfo.AvgYearOfService, docInfo.AvgAnnualSalary, docInfo.EmployeeInformation)
+				if err != nil {
+					fmt.Printf("docID: %s, 会社名: %s 有価証券情報のDBインサートに失敗しました。 %s", doc.DocID, doc.FilerName, err)
+					tx.Rollback()
+					continue
+				}
+			}
+		}
+		err = tx.Commit()
+		if err != nil {
+			fmt.Printf("%s のDBのコミットに失敗しました。 %s", d, err)
+			tx.Rollback()
+			continue
 		}
 	}
-
 }
 
 func NewCreateDBCmd() *cobra.Command {
