@@ -2,49 +2,59 @@ package db
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
-// どこかでエラー処理ちゃんといれる。
-
 var db *gorm.DB
 
 const dbName = "company.db"
 
 type Documents struct {
-	DocID string	`gorm:"primaryKey"`
-	SecCode string
-	FilerName string `gorm:"index"`
-	DocDescription string
-	SubmitDatetime string
-	AvgAge string
-	AvgYearOfService string
-	AvgAnnualSalary string `gorm:"index"`
+	DocID               string `gorm:"primaryKey"`
+	SecCode             string
+	FilerName           string `gorm:"index"`
+	DocDescription      string
+	SubmitDatetime      string
+	AvgAge              string
+	AvgYearOfService    string
+	AvgAnnualSalary     string `gorm:"index"`
 	EmployeeInformation string
 }
 
-func DeleteDB() {
-	os.Remove(dbName)
+func DeleteDB() error {
+	err := os.Remove(dbName)
+	if err != nil {
+		fmt.Println("DBの削除に失敗しました。 ", err)
+	}
+	return nil
 }
 
-func OpenDB() {
+func OpenDB() error {
 	var err error
 	db, err = gorm.Open(sqlite.Open(dbName), &gorm.Config{})
 	if err != nil {
-		log.Fatal("DBへの接続失敗", err)
+		return fmt.Errorf("DBへの接続失敗 %s", err)
 	}
+	return nil
 }
 
-func CreateDocumentTable() {
-	db.AutoMigrate(&Documents{})
+func CreateDocumentTable() error {
+	err := db.AutoMigrate(&Documents{})
+	if err != nil {
+		return fmt.Errorf("テーブルの初期化に失敗 %s", err)
+	}
+	return nil
 }
 
-func InsertDocument(d Documents) {
-	db.Create(d)
+func InsertDocument(d Documents) error {
+	result := db.Create(d)
+	if result.Error != nil {
+		return fmt.Errorf("ドキュメントデータの挿入に失敗 %s", result.Error)
+	}
+	return nil
 }
 
 func GetDocuments(filerNames []string) ([]Documents, error) {

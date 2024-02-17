@@ -11,11 +11,9 @@ import (
 
 var companies []string
 
-
-
 func NewSearchCmd() *cobra.Command {
 	c := &cobra.Command{
-		Use: "search",
+		Use:   "search",
 		Short: "会社の情報を表示します。先にcreatedbコマンドを実施してから利用してください。",
 		Run: func(cmd *cobra.Command, args []string) {
 			db.OpenDB()

@@ -127,12 +127,21 @@ type SecuritiesInfo struct {
 	EmployeeInformation string
 }
 
-func initDB(){
-	db.DeleteDB()
+func initDB() {
+	err := db.DeleteDB()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	db.OpenDB()
+	err = db.OpenDB()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	db.CreateDocumentTable()
+	err = db.CreateDocumentTable()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func parseParams() (inputParams, error) {
@@ -261,17 +270,21 @@ func insertSecuritiesData(p inputParams) {
 					continue
 				}
 				dbData := db.Documents{
-					DocID: doc.DocID,
-					SecCode: doc.SecCode,
-					FilerName: doc.FilerName,
-					DocDescription: doc.DocDescription,
-					SubmitDatetime: doc.SubmitDateTime,
-					AvgAge: docInfo.AvgAge,
-					AvgYearOfService: docInfo.AvgYearOfService,
-					AvgAnnualSalary: docInfo.AvgAnnualSalary,
+					DocID:               doc.DocID,
+					SecCode:             doc.SecCode,
+					FilerName:           doc.FilerName,
+					DocDescription:      doc.DocDescription,
+					SubmitDatetime:      doc.SubmitDateTime,
+					AvgAge:              docInfo.AvgAge,
+					AvgYearOfService:    docInfo.AvgYearOfService,
+					AvgAnnualSalary:     docInfo.AvgAnnualSalary,
 					EmployeeInformation: docInfo.EmployeeInformation,
 				}
-				db.InsertDocument(dbData)
+				err = db.InsertDocument(dbData)
+				if err != nil {
+					fmt.Printf("docID: %s, 会社名: %s のデータ保存に失敗しました。 %s", doc.DocID, doc.FilerName, err)
+					continue
+				}
 			}
 		}
 	}
