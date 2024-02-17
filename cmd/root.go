@@ -22,6 +22,8 @@ func newRootCmd() *cobra.Command {
 	}
 
 	c.PersistentFlags().StringP("token", "t", "", "edinet api token. This cmd using v2")
+	viper.BindPFlag("api.token", c.PersistentFlags().Lookup("token"))
+
 	viper.SetDefault("EDINET_API_TOKEN","")
 	viper.BindEnv("api.token", "EDINET_API_TOKEN")
 
