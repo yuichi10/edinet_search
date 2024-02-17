@@ -12,6 +12,7 @@ import (
 )
 
 var companies []string
+var salary string
 var verbose bool
 
 func NewSearchCmd() *cobra.Command {
@@ -20,7 +21,7 @@ func NewSearchCmd() *cobra.Command {
 		Short: "会社の情報を表示します。先にcreatedbコマンドを実施してから利用してください。",
 		Run: func(cmd *cobra.Command, args []string) {
 			db.OpenDB()
-			docs, err := db.GetDocuments(companies)
+			docs, err := db.GetDocuments(companies, salary)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -32,7 +33,7 @@ func NewSearchCmd() *cobra.Command {
 			vTable.SetAutoWrapText(false)
 
 			for _, doc := range docs {
-				data := []string{doc.FilerName, fmt.Sprintf("%s年",doc.AvgYearOfService), fmt.Sprintf("%s歳",doc.AvgAge), fmt.Sprintf("%s円",doc.AvgAnnualSalary), doc.SubmitDatetime}
+				data := []string{doc.FilerName, fmt.Sprintf("%s年", doc.AvgYearOfService), fmt.Sprintf("%s歳", doc.AvgAge), fmt.Sprintf("%s円", doc.AvgAnnualSalary), doc.SubmitDatetime}
 				vData := []string{doc.FilerName, fmt.Sprintf("%s", doc.EmployeeInformation)}
 				table.Append(data)
 				vTable.Append(vData)
@@ -47,6 +48,7 @@ func NewSearchCmd() *cobra.Command {
 	}
 
 	c.Flags().StringSliceVarP(&companies, "companies", "c", make([]string, 0), "知りたい情報の会社の名前を書いていってください")
+	c.Flags().StringVarP(&salary, "salary", "s", "", "平均年収がいくら以上の会社を検索したいか記入してください")
 	c.Flags().BoolVarP(&verbose, "verbose", "v", false, "授業員情報に関しても表示する。")
 
 	return c

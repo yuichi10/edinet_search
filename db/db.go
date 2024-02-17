@@ -57,12 +57,30 @@ func InsertDocument(d Documents) error {
 	return nil
 }
 
-func GetDocuments(filerNames []string) ([]Documents, error) {
+func GetDocuments(filerNames []string, salary string) ([]Documents, error) {
 	var docs []Documents
 
 	query := db.Model(&Documents{})
-	for _, filerName := range filerNames {
-		query.Or("filer_name LIKE ?", fmt.Sprintf("%%%s%%", filerName))
+	setWhere := false
+	if len(filerNames) > 0 {
+		if !setWhere {
+			query.Where("filer_name LIKE ?", fmt.Sprintf("%%%s%%", filerNames[0]))
+		}
+		for i, filerName := range filerNames {
+			if i == 0 && !setWhere {
+				setWhere = true
+				continue
+			}
+			query.Or("filer_name LIKE ?", fmt.Sprintf("%%%s%%", filerName))
+		}
+	}
+	if salary != "" {
+		if !setWhere {
+			query.Where("avg_annual_salary > ?", salary)
+			setWhere = true
+		} else {
+			query.Or("avg_annual_salary > ?", salary)
+		}
 	}
 
 	result := query.Find(&docs)
