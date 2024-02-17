@@ -2,13 +2,17 @@ package createdb
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 /*
@@ -44,6 +48,53 @@ var startDate, endDate time.Time
 type inputParams struct {
 	startDate time.Time
 	endDate   time.Time
+}
+
+type Documents struct {
+	Metadata struct {
+		Title     string `json:"title"`
+		Parameter struct {
+			Date string `json:"date"`
+			Type string `json:"type"`
+		} `json:"parameter"`
+		Resultset struct {
+			Count int `json:"count"`
+		} `json:"resultset"`
+		ProcessDateTime string `json:"processDateTime"`
+		Status          string `json:"status"`
+		Message         string `json:"message"`
+	} `json:"metadata"`
+	Results []struct {
+		SeqNumber            int         `json:"seqNumber"`
+		DocID                string      `json:"docID"`
+		EdinetCode           string      `json:"edinetCode"`
+		SecCode              string      `json:"secCode"`
+		Jcn                  string      `json:"JCN"`
+		FilerName            string      `json:"filerName"`
+		FundCode             interface{} `json:"fundCode"`
+		OrdinanceCode        string      `json:"ordinanceCode"`
+		FormCode             string      `json:"formCode"`
+		DocTypeCode          string      `json:"docTypeCode"`
+		PeriodStart          interface{} `json:"periodStart"`
+		PeriodEnd            interface{} `json:"periodEnd"`
+		SubmitDateTime       string      `json:"submitDateTime"`
+		DocDescription       string      `json:"docDescription"`
+		IssuerEdinetCode     interface{} `json:"issuerEdinetCode"`
+		SubjectEdinetCode    interface{} `json:"subjectEdinetCode"`
+		SubsidiaryEdinetCode interface{} `json:"subsidiaryEdinetCode"`
+		CurrentReportReason  interface{} `json:"currentReportReason"`
+		ParentDocID          interface{} `json:"parentDocID"`
+		OpeDateTime          interface{} `json:"opeDateTime"`
+		WithdrawalStatus     string      `json:"withdrawalStatus"`
+		DocInfoEditStatus    string      `json:"docInfoEditStatus"`
+		DisclosureStatus     string      `json:"disclosureStatus"`
+		XbrlFlag             string      `json:"xbrlFlag"`
+		PdfFlag              string      `json:"pdfFlag"`
+		AttachDocFlag        string      `json:"attachDocFlag"`
+		EnglishDocFlag       string      `json:"englishDocFlag"`
+		CsvFlag              string      `json:"csvFlag"`
+		LegalStatus          string      `json:"legalStatus"`
+	} `json:"results"`
 }
 
 func initDB() (*sql.DB, error) {
@@ -84,7 +135,7 @@ func NewCreateDBCmd() *cobra.Command {
 		Use:   "createdb",
 		Short: "書類の一覧を取得するDBを作成します。すでにDBがある場合は不要です。",
 		Run: func(cmd *cobra.Command, args []string) {
-			_, err := parseParams()
+			p, err := parseParams()
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -92,6 +143,33 @@ func NewCreateDBCmd() *cobra.Command {
 			_, err = initDB()
 			if err != nil {
 				log.Fatal(err.Error())
+			}
+
+			parsedURL, err := url.Parse(EDINET_API_ENDPOINT)
+			if err != nil {
+				log.Fatal(err)
+			}
+			params := url.Values{}
+			params.Add("Subscription-Key", viper.GetString("api.token"))
+			params.Add("type", "2")
+			for d := p.startDate; !d.After(p.endDate); d = d.AddDate(0, 0, 1) {
+				params.Set("date", d.Format("2006-01-02"))
+				parsedURL.RawQuery = params.Encode()
+				resp, err := http.Get(parsedURL.String())
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer resp.Body.Close()
+				docs := Documents{}
+				decoder := json.NewDecoder(resp.Body)
+				if err := decoder.Decode(&docs); err != nil {
+					log.Fatal(err)
+				}
+				fmt.Println("以下の日付のデータだよー")
+				fmt.Println(d.String())
+				fmt.Printf("%v", docs)
+				fmt.Println()
+				fmt.Println()
 			}
 
 		},
