@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
-	"database/sql"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
 	"strings"
 	"time"
@@ -20,6 +18,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/yuichi10/edinet_search/db"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 )
@@ -62,13 +61,9 @@ TODO
 
 const EDINET_DOCUMENT_META_API_ENDPOINT = "https://api.edinet-fsa.go.jp/api/v2/documents.json"
 const EDINET_DOCUMENT_API_ENDPOINT = "https://api.edinet-fsa.go.jp/api/v2/documents/"
-const DB_NAME = "company.db"
 
 // args
 var strStartDate, strEndDate string
-var preserveSecurities bool
-
-var startDate, endDate time.Time
 
 type inputParams struct {
 	startDate time.Time
@@ -132,21 +127,12 @@ type SecuritiesInfo struct {
 	EmployeeInformation string
 }
 
-func initDB() (*sql.DB, error) {
-	os.Remove(DB_NAME)
-	db, err := sql.Open("sqlite3", DB_NAME)
-	if err != nil {
-		return nil, fmt.Errorf("sqliteのファイルを参照するのに失敗しました。 %s", err.Error())
-	}
+func initDB(){
+	db.DeleteDB()
 
-	sqlStmt := `
-			create table documents (doc_id text not null primary key, sec_code text, filer_name text, doc_description text, submit_datetime text, avg_age text, avg_year_of_service text, avg_annual_salary text, employee_information text);
-			`
-	_, err = db.Exec(sqlStmt)
-	if err != nil {
-		return nil, fmt.Errorf("tableの作成に失敗しました。 %s", err.Error())
-	}
-	return db, err
+	db.OpenDB()
+
+	db.CreateDocumentTable()
 }
 
 func parseParams() (inputParams, error) {
@@ -258,48 +244,35 @@ func getDocument(doc *Document) (*SecuritiesInfo, error) {
 	return securInfo, nil
 }
 
-func insertSecuritiesData(p inputParams, db *sql.DB) {
+func insertSecuritiesData(p inputParams) {
 	for d := p.startDate; !d.After(p.endDate); d = d.AddDate(0, 0, 1) {
 		docs, err := getDocumentInfo(d)
 		if err != nil {
 			fmt.Printf("%s のデータの取得に失敗しました。 %s", d, err)
 			continue
 		}
-		tx, err := db.Begin()
-		if err != nil {
-			fmt.Printf("%s のDBの開始に取得に失敗しました。 %s", d, err)
-			tx.Rollback()
-			continue
-		}
-		stmt, err := tx.Prepare("insert into documents(doc_id, sec_code, filer_name, doc_description, submit_datetime, avg_age, avg_year_of_service, avg_annual_salary, employee_information) values(?, ?, ?, ?, ?, ?, ?, ?, ?)")
-		if err != nil {
-			fmt.Printf("%s のDBのクエリの準備に失敗しました。 %s", d, err)
-			tx.Rollback()
-			continue
-		}
-		defer stmt.Close()
+
 		for _, doc := range docs.Results {
 			if doc.OrdinanceCode == "010" && doc.FormCode == "030000" {
 				fmt.Print(".")
 				docInfo, err := getDocument(&doc)
 				if err != nil {
 					fmt.Printf("docID: %s, 会社名: %s 有価証券情報の取得に失敗しました。 %s", doc.DocID, doc.FilerName, err)
-					tx.Rollback()
 					continue
 				}
-				_, err = stmt.Exec(doc.DocID, doc.SecCode, doc.FilerName, doc.DocDescription, doc.SubmitDateTime, docInfo.AvgAge, docInfo.AvgYearOfService, docInfo.AvgAnnualSalary, docInfo.EmployeeInformation)
-				if err != nil {
-					fmt.Printf("docID: %s, 会社名: %s 有価証券情報のDBインサートに失敗しました。 %s", doc.DocID, doc.FilerName, err)
-					tx.Rollback()
-					continue
+				dbData := db.Documents{
+					DocID: doc.DocID,
+					SecCode: doc.SecCode,
+					FilerName: doc.FilerName,
+					DocDescription: doc.DocDescription,
+					SubmitDatetime: doc.SubmitDateTime,
+					AvgAge: docInfo.AvgAge,
+					AvgYearOfService: docInfo.AvgYearOfService,
+					AvgAnnualSalary: docInfo.AvgAnnualSalary,
+					EmployeeInformation: docInfo.EmployeeInformation,
 				}
+				db.InsertDocument(dbData)
 			}
-		}
-		err = tx.Commit()
-		if err != nil {
-			fmt.Printf("%s のDBのコミットに失敗しました。 %s", d, err)
-			tx.Rollback()
-			continue
 		}
 	}
 }
@@ -314,14 +287,10 @@ func NewCreateDBCmd() *cobra.Command {
 				log.Fatal(err.Error())
 			}
 			fmt.Println("空のDBを作成します。")
-			db, err := initDB()
-			if err != nil {
-				log.Fatal(err.Error())
-			}
-			defer db.Close()
+			initDB()
 
 			fmt.Println("ドキュメントの情報をDBに書き込んでいます.")
-			insertSecuritiesData(p, db)
+			insertSecuritiesData(p)
 		},
 	}
 
