@@ -4,16 +4,42 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/yuichi10/edinet_search/db"
+	"golang.org/x/term"
 )
 
 var companies []string
 var salary string
 var verbose bool
+
+func makeNewLineText(text string, length int) string {
+	replacer := strings.NewReplacer(
+		"\t", "",
+		"\r", "",
+		"\n", "",
+		" ", "",
+	)
+	text = replacer.Replace(text)
+
+	runeText := []rune(text)
+
+	var splits []string
+	for start := 0; start < len(runeText); start += length {
+		end := start + length
+		if end > len(runeText) {
+			end = len(runeText)
+		}
+		split := runeText[start:end]
+		splits = append(splits, string(split))
+	}
+
+	return strings.Join(splits, "\n")
+}
 
 func NewSearchCmd() *cobra.Command {
 	c := &cobra.Command{
@@ -26,15 +52,22 @@ func NewSearchCmd() *cobra.Command {
 				log.Fatal(err)
 			}
 
+			width, _, err := term.GetSize(int(os.Stdout.Fd()))
+			width = width / 3	// マルチバイトの日本語を考えて /2　あとは会社名分を考えて合わせて/3くらいをしている。
+			if err != nil {
+				width = 30
+			}
+
 			table := tablewriter.NewWriter(os.Stdout)
 			table.SetHeader([]string{"会社名", "勤続年数", "平均年齢", "平均年収", "情報の追加日"})
 			vTable := tablewriter.NewWriter(os.Stdout)
 			vTable.SetHeader([]string{"会社名", "授業員情報"})
-			vTable.SetAutoWrapText(false)
+			vTable.SetRowLine(true)
+			vTable.SetRowSeparator("-")
 
 			for _, doc := range docs {
 				data := []string{doc.FilerName, fmt.Sprintf("%s年", doc.AvgYearOfService), fmt.Sprintf("%s歳", doc.AvgAge), fmt.Sprintf("%s円", doc.AvgAnnualSalary), doc.SubmitDatetime}
-				vData := []string{doc.FilerName, fmt.Sprintf("%s", doc.EmployeeInformation)}
+				vData := []string{doc.FilerName, makeNewLineText(doc.EmployeeInformation, width)}
 				table.Append(data)
 				vTable.Append(vData)
 			}
@@ -44,6 +77,8 @@ func NewSearchCmd() *cobra.Command {
 				fmt.Println("詳細情報")
 				vTable.Render()
 			}
+
+			// fmt.Println(makeNewLineText(docs[0].EmployeeInformation, width))
 		},
 	}
 
