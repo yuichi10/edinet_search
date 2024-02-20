@@ -247,7 +247,6 @@ func getSecuritiesInfo(meta *DocumentMeta) (*SecuritiesInfo, error) {
 					securInfo.EmployeeInformation = record[len(record)-1]
 				case "jpcrp_cor:NumberOfEmployees":
 					// 従業員数 (当社)
-					fmt.Println(record[2])
 					if record[2] == "CurrentYearInstant_NonConsolidatedMember" {
 						securInfo.NumberOfEmployees = record[len(record)-1]
 					}

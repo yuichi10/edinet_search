@@ -13,6 +13,8 @@ import (
 	"golang.org/x/term"
 )
 
+const EDINET_PDF_URL = "https://disclosure2dl.edinet-fsa.go.jp/searchdocument/pdf"
+
 var companies []string
 var salary string
 var verbose bool
@@ -59,14 +61,19 @@ func NewSearchCmd() *cobra.Command {
 			}
 
 			table := tablewriter.NewWriter(os.Stdout)
-			table.SetHeader([]string{"会社名", "勤続年数", "平均年齢", "平均年収", "従業員数", "情報の追加日"})
+			// table.SetHeader([]string{"会社名", "勤続年数", "平均年齢", "平均年収", "従業員数", "情報の追加日"})
+			// table.SetAutoFormatHeaders(false)
+			// table.EnableBorder(false)
+			table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
 			vTable := tablewriter.NewWriter(os.Stdout)
 			vTable.SetHeader([]string{"会社名", "授業員情報"})
 			vTable.SetRowLine(true)
 			vTable.SetRowSeparator("-")
 
+			table.Append([]string{fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", fmt.Sprintf("%s/%s.pdf",EDINET_PDF_URL, "DUMMY012"), "会社名"), "勤続年数", "平均年齢", "平均年収", "従業員数", "情報の追加日"})
 			for _, doc := range docs {
-				data := []string{doc.FilerName, fmt.Sprintf("%s年", doc.AvgYearOfService), fmt.Sprintf("%s歳", doc.AvgAge), fmt.Sprintf("%s円", doc.AvgAnnualSalary), fmt.Sprintf("%s人", doc.NumberOfEmployees), doc.SubmitDatetime}
+				pdfURL := fmt.Sprintf("%s/%s.pdf", EDINET_PDF_URL, doc.DocID)
+				data := []string{fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", pdfURL, doc.FilerName), fmt.Sprintf("%s年", doc.AvgYearOfService), fmt.Sprintf("%s歳", doc.AvgAge), fmt.Sprintf("%s円", doc.AvgAnnualSalary), fmt.Sprintf("%s人", doc.NumberOfEmployees), doc.SubmitDatetime}
 				vData := []string{doc.FilerName, makeNewLineText(doc.EmployeeInformation, width)}
 				table.Append(data)
 				vTable.Append(vData)
