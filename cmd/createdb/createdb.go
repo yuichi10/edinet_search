@@ -70,7 +70,7 @@ type inputParams struct {
 	endDate   time.Time
 }
 
-type Document struct {
+type DocumentMeta struct {
 	SeqNumber            int         `json:"seqNumber"`
 	DocID                string      `json:"docID"`
 	EdinetCode           string      `json:"edinetCode"`
@@ -102,7 +102,7 @@ type Document struct {
 	LegalStatus          string      `json:"legalStatus"`
 }
 
-type Documents struct {
+type DocumentsMeta struct {
 	Metadata struct {
 		Title     string `json:"title"`
 		Parameter struct {
@@ -116,7 +116,7 @@ type Documents struct {
 		Status          string `json:"status"`
 		Message         string `json:"message"`
 	} `json:"metadata"`
-	Results []Document `json:"results"`
+	Results []DocumentMeta `json:"results"`
 }
 
 type SecuritiesInfo struct {
@@ -159,7 +159,7 @@ func parseParams() (inputParams, error) {
 	return params, nil
 }
 
-func getDocumentInfo(d time.Time) (*Documents, error) {
+func getDocumentMetaInfo(d time.Time) (*DocumentsMeta, error) {
 	parsedURL, err := url.Parse(EDINET_DOCUMENT_META_API_ENDPOINT)
 	if err != nil {
 		log.Fatal(err)
@@ -175,7 +175,7 @@ func getDocumentInfo(d time.Time) (*Documents, error) {
 
 	}
 	defer resp.Body.Close()
-	docs := Documents{}
+	docs := DocumentsMeta{}
 	decoder := json.NewDecoder(resp.Body)
 	if err := decoder.Decode(&docs); err != nil {
 		return nil, fmt.Errorf("取得したドキュメントデータのパースに失敗しました %s", err)
@@ -183,13 +183,13 @@ func getDocumentInfo(d time.Time) (*Documents, error) {
 	return &docs, nil
 }
 
-func getDocument(doc *Document) (*SecuritiesInfo, error) {
+func getSecuritiesInfo(meta *DocumentMeta) (*SecuritiesInfo, error) {
 	docParsedURL, err := url.Parse(EDINET_DOCUMENT_API_ENDPOINT)
 	if err != nil {
 		// return nil, fmt.Errorf("ドキュメントURLのパースに失敗しました %s", err)
 		log.Fatalln(err)
 	}
-	docParsedURL.Path = path.Join(docParsedURL.Path, doc.DocID)
+	docParsedURL.Path = path.Join(docParsedURL.Path, meta.DocID)
 	params := url.Values{}
 	params.Add("Subscription-Key", viper.GetString("api.token"))
 	params.Add("type", "5")
@@ -200,7 +200,7 @@ func getDocument(doc *Document) (*SecuritiesInfo, error) {
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("docID: %s, 会社名: %s のドキュメントファイルの取得に失敗しました", doc.DocID, doc.FilerName)
+		return nil, fmt.Errorf("docID: %s, 会社名: %s のドキュメントファイルの取得に失敗しました", meta.DocID, meta.FilerName)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -209,7 +209,7 @@ func getDocument(doc *Document) (*SecuritiesInfo, error) {
 
 	zipReader, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
 	if err != nil {
-		return nil, fmt.Errorf("docID: %s, 会社名: %s のドキュメントファイルの解答に失敗しました %s", doc.DocID, doc.FilerName, err)
+		return nil, fmt.Errorf("docID: %s, 会社名: %s のドキュメントファイルの解答に失敗しました %s", meta.DocID, meta.FilerName, err)
 	}
 
 	securInfo := &SecuritiesInfo{}
@@ -245,6 +245,12 @@ func getDocument(doc *Document) (*SecuritiesInfo, error) {
 					securInfo.AvgAnnualSalary = record[len(record)-1]
 				case "jpcrp_cor:InformationAboutEmployeesTextBlock":
 					securInfo.EmployeeInformation = record[len(record)-1]
+				case "jpcrp_cor:NumberOfEmployees":
+					// 従業員数 (当社)
+					fmt.Println(record[2])
+					if record[2] == "CurrentYearInstant_NonConsolidatedMember" {
+						securInfo.NumberOfEmployees = record[len(record)-1]
+					}
 				}
 			}
 		}
@@ -253,36 +259,41 @@ func getDocument(doc *Document) (*SecuritiesInfo, error) {
 	return securInfo, nil
 }
 
+func convertDataToDBDocuments(meta *DocumentMeta, secInfo *SecuritiesInfo) db.Companies {
+	return db.Companies{
+		DocID:               meta.DocID,
+		SecCode:             meta.SecCode,
+		FilerName:           meta.FilerName,
+		DocDescription:      meta.DocDescription,
+		SubmitDatetime:      meta.SubmitDateTime,
+		NumberOfEmployees:   secInfo.NumberOfEmployees,
+		AvgAge:              secInfo.AvgAge,
+		AvgYearOfService:    secInfo.AvgYearOfService,
+		AvgAnnualSalary:     secInfo.AvgAnnualSalary,
+		EmployeeInformation: secInfo.EmployeeInformation,
+	}
+}
+
 func insertSecuritiesData(p inputParams) {
 	for d := p.startDate; !d.After(p.endDate); d = d.AddDate(0, 0, 1) {
-		docs, err := getDocumentInfo(d)
+		meta, err := getDocumentMetaInfo(d)
 		if err != nil {
 			fmt.Printf("%s のデータの取得に失敗しました。 %s", d, err)
 			continue
 		}
 
-		for _, doc := range docs.Results {
-			if doc.OrdinanceCode == "010" && doc.FormCode == "030000" {
+		for _, m := range meta.Results {
+			if m.OrdinanceCode == "010" && m.FormCode == "030000" {
 				fmt.Print(".")
-				docInfo, err := getDocument(&doc)
+				docInfo, err := getSecuritiesInfo(&m)
 				if err != nil {
-					fmt.Printf("docID: %s, 会社名: %s 有価証券情報の取得に失敗しました。 %s", doc.DocID, doc.FilerName, err)
+					fmt.Printf("docID: %s, 会社名: %s 有価証券情報の取得に失敗しました。 %s", m.DocID, m.FilerName, err)
 					continue
 				}
-				dbData := db.Documents{
-					DocID:               doc.DocID,
-					SecCode:             doc.SecCode,
-					FilerName:           doc.FilerName,
-					DocDescription:      doc.DocDescription,
-					SubmitDatetime:      doc.SubmitDateTime,
-					AvgAge:              docInfo.AvgAge,
-					AvgYearOfService:    docInfo.AvgYearOfService,
-					AvgAnnualSalary:     docInfo.AvgAnnualSalary,
-					EmployeeInformation: docInfo.EmployeeInformation,
-				}
+				dbData := convertDataToDBDocuments(&m, docInfo)
 				err = db.InsertDocument(dbData)
 				if err != nil {
-					fmt.Printf("docID: %s, 会社名: %s のデータ保存に失敗しました。 %s", doc.DocID, doc.FilerName, err)
+					fmt.Printf("docID: %s, 会社名: %s のデータ保存に失敗しました。 %s", m.DocID, m.FilerName, err)
 					continue
 				}
 			}

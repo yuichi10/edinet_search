@@ -12,7 +12,7 @@ var db *gorm.DB
 
 const dbName = "company.db"
 
-type Documents struct {
+type Companies struct {
 	DocID               string `gorm:"primaryKey"` // ドキュメントID
 	SecCode             string // コード
 	FilerName           string `gorm:"index"` // 上げた人・会社
@@ -21,6 +21,7 @@ type Documents struct {
 	AvgAge              string // 働いている人の平均年齢
 	AvgYearOfService    string // 働いている人が大体何年間働いているか
 	AvgAnnualSalary     string `gorm:"index"` // 平均年収
+	NumberOfEmployees   string // 従業員数
 	EmployeeInformation string // 授業員情報
 }
 
@@ -42,14 +43,14 @@ func OpenDB() error {
 }
 
 func CreateDocumentTable() error {
-	err := db.AutoMigrate(&Documents{})
+	err := db.AutoMigrate(&Companies{})
 	if err != nil {
 		return fmt.Errorf("テーブルの初期化に失敗 %s", err)
 	}
 	return nil
 }
 
-func InsertDocument(d Documents) error {
+func InsertDocument(d Companies) error {
 	result := db.Create(d)
 	if result.Error != nil {
 		return fmt.Errorf("ドキュメントデータの挿入に失敗 %s", result.Error)
@@ -57,10 +58,10 @@ func InsertDocument(d Documents) error {
 	return nil
 }
 
-func GetDocuments(filerNames []string, salary string) ([]Documents, error) {
-	var docs []Documents
+func GetDocuments(filerNames []string, salary string) ([]Companies, error) {
+	var docs []Companies
 
-	query := db.Model(&Documents{})
+	query := db.Model(&Companies{})
 	setWhere := false
 	if len(filerNames) > 0 {
 		if !setWhere {

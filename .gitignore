@@ -25,3 +25,4 @@ edinet
 .envrc
 XBRL_TO_CSV*
 company.db
+*.db

@@ -53,7 +53,7 @@ func NewSearchCmd() *cobra.Command {
 			}
 
 			width, _, err := term.GetSize(int(os.Stdout.Fd()))
-			width = width / 3	// マルチバイトの日本語を考えて /2　あとは会社名分を考えて合わせて/3くらいをしている。
+			width = width / 3 // マルチバイトの日本語を考えて /2　あとは会社名分を考えて合わせて/3くらいをしている。
 			if err != nil {
 				width = 30
 			}
