@@ -47,7 +47,7 @@ func NewSearchCmd() *cobra.Command {
 		Short: "会社の情報を表示します。先にcreatedbコマンドを実施してから利用してください。",
 		Run: func(cmd *cobra.Command, args []string) {
 			db.OpenDB()
-			docs, err := db.GetDocuments(companies, salary)
+			docs, err := db.GetCompanies(companies, salary)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -59,14 +59,14 @@ func NewSearchCmd() *cobra.Command {
 			}
 
 			table := tablewriter.NewWriter(os.Stdout)
-			table.SetHeader([]string{"会社名", "勤続年数", "平均年齢", "平均年収", "情報の追加日"})
+			table.SetHeader([]string{"会社名", "勤続年数", "平均年齢", "平均年収", "従業員数", "情報の追加日"})
 			vTable := tablewriter.NewWriter(os.Stdout)
 			vTable.SetHeader([]string{"会社名", "授業員情報"})
 			vTable.SetRowLine(true)
 			vTable.SetRowSeparator("-")
 
 			for _, doc := range docs {
-				data := []string{doc.FilerName, fmt.Sprintf("%s年", doc.AvgYearOfService), fmt.Sprintf("%s歳", doc.AvgAge), fmt.Sprintf("%s円", doc.AvgAnnualSalary), doc.SubmitDatetime}
+				data := []string{doc.FilerName, fmt.Sprintf("%s年", doc.AvgYearOfService), fmt.Sprintf("%s歳", doc.AvgAge), fmt.Sprintf("%s円", doc.AvgAnnualSalary), fmt.Sprintf("%s人", doc.NumberOfEmployees), doc.SubmitDatetime}
 				vData := []string{doc.FilerName, makeNewLineText(doc.EmployeeInformation, width)}
 				table.Append(data)
 				vTable.Append(vData)

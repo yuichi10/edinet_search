@@ -138,7 +138,7 @@ func initDB() {
 		log.Fatal(err)
 	}
 
-	err = db.CreateDocumentTable()
+	err = db.CreateCompaniesTable()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -259,7 +259,7 @@ func getSecuritiesInfo(meta *DocumentMeta) (*SecuritiesInfo, error) {
 	return securInfo, nil
 }
 
-func convertDataToDBDocuments(meta *DocumentMeta, secInfo *SecuritiesInfo) db.Companies {
+func convertDataToDBCompanies(meta *DocumentMeta, secInfo *SecuritiesInfo) db.Companies {
 	return db.Companies{
 		DocID:               meta.DocID,
 		SecCode:             meta.SecCode,
@@ -290,8 +290,8 @@ func insertSecuritiesData(p inputParams) {
 					fmt.Printf("docID: %s, 会社名: %s 有価証券情報の取得に失敗しました。 %s", m.DocID, m.FilerName, err)
 					continue
 				}
-				dbData := convertDataToDBDocuments(&m, docInfo)
-				err = db.InsertDocument(dbData)
+				dbData := convertDataToDBCompanies(&m, docInfo)
+				err = db.InsertCompanies(dbData)
 				if err != nil {
 					fmt.Printf("docID: %s, 会社名: %s のデータ保存に失敗しました。 %s", m.DocID, m.FilerName, err)
 					continue

@@ -42,7 +42,7 @@ func OpenDB() error {
 	return nil
 }
 
-func CreateDocumentTable() error {
+func CreateCompaniesTable() error {
 	err := db.AutoMigrate(&Companies{})
 	if err != nil {
 		return fmt.Errorf("テーブルの初期化に失敗 %s", err)
@@ -50,7 +50,7 @@ func CreateDocumentTable() error {
 	return nil
 }
 
-func InsertDocument(d Companies) error {
+func InsertCompanies(d Companies) error {
 	result := db.Create(d)
 	if result.Error != nil {
 		return fmt.Errorf("ドキュメントデータの挿入に失敗 %s", result.Error)
@@ -58,7 +58,7 @@ func InsertDocument(d Companies) error {
 	return nil
 }
 
-func GetDocuments(filerNames []string, salary string) ([]Companies, error) {
+func GetCompanies(filerNames []string, salary string) ([]Companies, error) {
 	var docs []Companies
 
 	query := db.Model(&Companies{})
