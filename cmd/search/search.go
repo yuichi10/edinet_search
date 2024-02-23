@@ -70,7 +70,7 @@ func NewSearchCmd() *cobra.Command {
 			vTable.SetRowLine(true)
 			vTable.SetRowSeparator("-")
 
-			table.Append([]string{fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", fmt.Sprintf("%s/%s.pdf",EDINET_PDF_URL, "DUMMY012"), "会社名"), "勤続年数", "平均年齢", "平均年収", "従業員数", "情報の追加日"})
+			table.Append([]string{fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", fmt.Sprintf("%s/%s.pdf", EDINET_PDF_URL, "DUMMY012"), "会社名"), "勤続年数", "平均年齢", "平均年収", "従業員数", "情報の追加日"})
 			for _, doc := range docs {
 				pdfURL := fmt.Sprintf("%s/%s.pdf", EDINET_PDF_URL, doc.DocID)
 				data := []string{fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", pdfURL, doc.FilerName), fmt.Sprintf("%s年", doc.AvgYearOfService), fmt.Sprintf("%s歳", doc.AvgAge), fmt.Sprintf("%s円", doc.AvgAnnualSalary), fmt.Sprintf("%s人", doc.NumberOfEmployees), doc.SubmitDatetime}

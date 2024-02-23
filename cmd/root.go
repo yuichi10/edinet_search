@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/yuichi10/edinet_search/cmd/api"
 	"github.com/yuichi10/edinet_search/cmd/createdb"
 	"github.com/yuichi10/edinet_search/cmd/search"
 )
@@ -29,6 +30,7 @@ func newRootCmd() *cobra.Command {
 
 	c.AddCommand(createdb.NewCreateDBCmd())
 	c.AddCommand(search.NewSearchCmd())
+	c.AddCommand(api.New())
 
 	return c
 }
