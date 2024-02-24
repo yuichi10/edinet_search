@@ -15,7 +15,7 @@ import (
 
 const EDINET_PDF_URL = "https://disclosure2dl.edinet-fsa.go.jp/searchdocument/pdf"
 
-var companies []string
+var company string
 var salary string
 var verbose bool
 
@@ -49,7 +49,7 @@ func NewSearchCmd() *cobra.Command {
 		Short: "会社の情報を表示します。先にcreatedbコマンドを実施してから利用してください。",
 		Run: func(cmd *cobra.Command, args []string) {
 			db.OpenDB()
-			docs, err := db.GetCompanies(companies, salary)
+			docs, err := db.GetCompanies(company, salary)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -89,7 +89,7 @@ func NewSearchCmd() *cobra.Command {
 		},
 	}
 
-	c.Flags().StringSliceVarP(&companies, "companies", "c", make([]string, 0), "知りたい情報の会社の名前を書いていってください")
+	c.Flags().StringVarP(&company, "companies", "c", "", "知りたい情報の会社の名前を書いていってください")
 	c.Flags().StringVarP(&salary, "salary", "s", "", "平均年収がいくら以上の会社を検索したいか記入してください")
 	c.Flags().BoolVarP(&verbose, "verbose", "v", false, "授業員情報に関しても表示する。")
 

@@ -58,21 +58,15 @@ func InsertCompanies(d Companies) error {
 	return nil
 }
 
-func GetCompanies(filerNames []string, salary string) ([]Companies, error) {
+func GetCompanies(filerNames string, salary string) ([]Companies, error) {
 	var docs []Companies
 
 	query := db.Model(&Companies{})
 	setWhere := false
-	if len(filerNames) > 0 {
+	if filerNames != "" {
 		if !setWhere {
-			query.Where("filer_name LIKE ?", fmt.Sprintf("%%%s%%", filerNames[0]))
-		}
-		for i, filerName := range filerNames {
-			if i == 0 && !setWhere {
-				setWhere = true
-				continue
-			}
-			query.Or("filer_name LIKE ?", fmt.Sprintf("%%%s%%", filerName))
+			query.Where("filer_name LIKE ?", fmt.Sprintf("%%%s%%", filerNames))
+			setWhere = true
 		}
 	}
 	if salary != "" {
