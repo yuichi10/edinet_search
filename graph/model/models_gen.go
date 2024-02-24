@@ -2,25 +2,23 @@
 
 package model
 
-type Mutation struct {
+type Company struct {
+	DocID               string `json:"docID"`
+	SecCode             string `json:"secCode"`
+	FilerName           string `json:"filerName"`
+	DocDescription      string `json:"docDescription"`
+	SubmitDatetime      string `json:"submitDatetime"`
+	AvgAge              string `json:"avgAge"`
+	AvgYearOfService    string `json:"avgYearOfService"`
+	AvgAnnualSalary     string `json:"avgAnnualSalary"`
+	NumberOfEmployees   string `json:"numberOfEmployees"`
+	EmployeeInformation string `json:"employeeInformation"`
 }
 
-type NewTodo struct {
-	Text   string `json:"text"`
-	UserID string `json:"userId"`
+type CompanyFilter struct {
+	FilerName       *string `json:"filerName,omitempty"`
+	AvgAnnualSalary *string `json:"avgAnnualSalary,omitempty"`
 }
 
 type Query struct {
-}
-
-type Todo struct {
-	ID   string `json:"id"`
-	Text string `json:"text"`
-	Done bool   `json:"done"`
-	User *User  `json:"user"`
-}
-
-type User struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
 }

@@ -7,50 +7,47 @@ package graph
 import (
 	"context"
 
+	"github.com/yuichi10/edinet_search/db"
 	"github.com/yuichi10/edinet_search/graph/model"
 )
 
-// CreateTodo is the resolver for the createTodo field.
-func (r *mutationResolver) CreateTodo(ctx context.Context, input model.NewTodo) (*model.Todo, error) {
-	return &model.Todo{
-		ID:   "TODO-3",
-		Text: input.Text,
-		User: &model.User{
-			ID:   input.UserID,
-			Name: "name",
-		},
-	}, nil
+func convertCompany(c db.Companies) *model.Company {
+	return &model.Company{
+		DocID:               c.DocID,
+        SecCode:             c.SecCode,
+        FilerName:           c.FilerName,
+        DocDescription:      c.DocDescription,
+        SubmitDatetime:      c.SubmitDatetime,
+        AvgAge:              c.AvgAge,
+        AvgYearOfService:    c.AvgYearOfService,
+        AvgAnnualSalary:     c.AvgAnnualSalary,
+        NumberOfEmployees:   c.NumberOfEmployees,
+        EmployeeInformation: c.EmployeeInformation,
+	}
 }
 
-// Todos is the resolver for the todos field.
-func (r *queryResolver) Todos(ctx context.Context) ([]*model.Todo, error) {
-	return []*model.Todo{
-		{
-			ID:   "TODO-1",
-			Text: "My Todo 1",
-			User: &model.User{
-				ID:   "User-1",
-				Name: "hsaki",
-			},
-			Done: true,
-		},
-		{
-			ID:   "TODO-2",
-			Text: "My Todo 2",
-			User: &model.User{
-				ID:   "User-1",
-				Name: "hsaki",
-			},
-			Done: false,
-		},
-	}, nil
+func convertCompanies(cs []db.Companies) []*model.Company {
+	var companies []*model.Company
+	for _, c := range cs {
+		companies = append(companies, convertCompany(c))
+	}
+	return companies
 }
 
-// Mutation returns MutationResolver implementation.
-func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
+// Companies is the resolver for the Companies field.
+func (r *queryResolver) Companies(ctx context.Context, filter *model.CompanyFilter) ([]*model.Company, error) {
+	var filerName, avgAnnualSalary string
+	if filter.FilerName != nil {
+		filerName =  *filter.FilerName
+	}
+	if filter.AvgAnnualSalary != nil {
+		avgAnnualSalary = *filter.AvgAnnualSalary
+	}
+	companies, err := db.GetCompanies(filerName, avgAnnualSalary)
+	return convertCompanies(companies), err
+}
 
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
-type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }

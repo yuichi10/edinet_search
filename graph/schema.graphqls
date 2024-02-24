@@ -2,27 +2,28 @@
 #
 # https://gqlgen.com/getting-started/
 
-type Todo {
-  id: ID!
-  text: String!
-  done: Boolean!
-  user: User!
+type Company {
+  docID: String!
+  secCode: String!
+  filerName: String!
+  docDescription: String!
+  submitDatetime: String!
+  avgAge: String!
+	avgYearOfService: String!
+  avgAnnualSalary: String!
+  numberOfEmployees: String!
+  employeeInformation: String!
 }
 
-type User {
-  id: ID!
-  name: String!
+input CompanyFilter {
+  filerName: String
+  avgAnnualSalary: String
 }
 
 type Query {
-  todos: [Todo!]!
+  Companies(filter: CompanyFilter): [Company!]!
 }
 
-input NewTodo {
-  text: String!
-  userId: String!
-}
-
-type Mutation {
-  createTodo(input: NewTodo!): Todo!
-}
+# type Mutation {
+#   # createTodo(input: NewTodo!): Todo!
+# }

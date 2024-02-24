@@ -8,6 +8,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/spf13/cobra"
+	"github.com/yuichi10/edinet_search/db"
 	"github.com/yuichi10/edinet_search/graph"
 )
 
@@ -28,13 +29,12 @@ func runServer() {
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
-
-
 func New() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "api",
 		Short: "検索用のAPIを立てます。",
 		Run: func(cmd *cobra.Command, args []string) {
+			db.OpenDB()
 			runServer()
 		},
 	}
