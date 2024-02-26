@@ -2,8 +2,10 @@ package api
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 
@@ -23,6 +25,48 @@ const defaultPort = "8080"
 //go:embed out/*
 var uiEmbedStaticFiles embed.FS
 
+func getLocalIP() []string{
+	ifaces, err := net.Interfaces()
+	var ipList []string
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	for _, iface := range ifaces {
+		if iface.Name == "en0" { // インターフェース名が "en0" の場合
+			// インターフェースのアドレスを取得
+			addrs, err := iface.Addrs()
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			// アドレスの一覧をループ
+			for _, addr := range addrs {
+				// IPネットワークアドレスを取得
+				ipNet, ok := addr.(*net.IPNet)
+				if !ok {
+					continue
+				}
+				ipList = append(ipList, ipNet.IP.String())
+			}
+		}
+	}
+	return ipList
+}
+
+func getAllowedOrigins() []string {
+	ipList := []string{"localhost"}
+	ipList = append(ipList, getLocalIP()...)
+
+	origins := make([]string, len(ipList))
+	for _, ip := range ipList {
+		origins = append(origins, fmt.Sprintf("http://%s:8080", ip))
+		origins = append(origins, fmt.Sprintf("http://%s:3000", ip))
+	}
+	return origins
+}
+
 func runServer() {
 	// 'out' ディレクトリの内容をサブディレクトリとして取得
 	uiStaticFiles, _ := fs.Sub(uiEmbedStaticFiles, "out")
@@ -38,7 +82,7 @@ func runServer() {
 	router := chi.NewRouter()
 
 	router.Use(cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:8080"},
+		AllowedOrigins:   getAllowedOrigins(),
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,

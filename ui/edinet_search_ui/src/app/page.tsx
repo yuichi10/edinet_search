@@ -1,5 +1,5 @@
 'use client';
-import { FormEvent, useState, useRef } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import { GraphQLClient } from 'graphql-request';
 
 type Company = {
@@ -21,8 +21,14 @@ type Companies = {
 
 export default function Home() {
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [apiHost, setApiHost] = useState<string>('');
 
-  const client = new GraphQLClient('http://localhost:8080/api/query')
+  useEffect(() => {
+    // コンポーネントがマウントされた後にwindowオブジェクトにアクセス
+    setApiHost(window.location.hostname);
+  }, []);
+
+  // const client = new GraphQLClient('http://localhost:8080/api/query')
   const query = `
     query SearchCompanies($filerName: String!) {
       Companies(filter: {filerName: $filerName}) {
@@ -40,6 +46,8 @@ export default function Home() {
     }
   `;
   const submitSearch = async(event: FormEvent<HTMLFormElement>) => {
+    const client = new GraphQLClient(`http://${apiHost}:8080/api/query`)
+
     event.preventDefault();
 
     const inputCompanyName = event.currentTarget.elements.namedItem("inputCompanyName") as HTMLInputElement;
