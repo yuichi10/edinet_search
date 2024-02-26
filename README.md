@@ -21,6 +21,22 @@ export EDINET_API_TOKEN=xxxxxx
 
 v2のAPIを使っている。
 
+## ビルド方法
+
+まずはUIのビルド
+
+```bash
+cd ui/edinet_search_ui
+npm build
+```
+
+その後バイナリ生成
+
+```bash
+go  generate
+go build -o edinet
+```
+
 ## DB作成
 
 まずはedinetから取ってきたデータでdbを作るために以下のコマンドを一度実行  
@@ -53,6 +69,14 @@ edinet search -s 4000000
 ```
 
 まだORでつなげるだけなので、会社と平均年収をどちらもセットすると、どちらかに引っかかるものがすべて表示されてしまう。
+
+## APIの構築
+
+```bash
+edinet api
+```
+
+localhost:8080に繋げればUIで表示される
 
 # やりたいこと
 

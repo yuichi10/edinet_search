@@ -14,15 +14,15 @@ import (
 func convertCompany(c db.Companies) *model.Company {
 	return &model.Company{
 		DocID:               c.DocID,
-        SecCode:             c.SecCode,
-        FilerName:           c.FilerName,
-        DocDescription:      c.DocDescription,
-        SubmitDatetime:      c.SubmitDatetime,
-        AvgAge:              c.AvgAge,
-        AvgYearOfService:    c.AvgYearOfService,
-        AvgAnnualSalary:     c.AvgAnnualSalary,
-        NumberOfEmployees:   c.NumberOfEmployees,
-        EmployeeInformation: c.EmployeeInformation,
+		SecCode:             c.SecCode,
+		FilerName:           c.FilerName,
+		DocDescription:      c.DocDescription,
+		SubmitDatetime:      c.SubmitDatetime,
+		AvgAge:              c.AvgAge,
+		AvgYearOfService:    c.AvgYearOfService,
+		AvgAnnualSalary:     c.AvgAnnualSalary,
+		NumberOfEmployees:   c.NumberOfEmployees,
+		EmployeeInformation: c.EmployeeInformation,
 	}
 }
 
@@ -38,7 +38,7 @@ func convertCompanies(cs []db.Companies) []*model.Company {
 func (r *queryResolver) Companies(ctx context.Context, filter *model.CompanyFilter) ([]*model.Company, error) {
 	var filerName, avgAnnualSalary string
 	if filter.FilerName != nil {
-		filerName =  *filter.FilerName
+		filerName = *filter.FilerName
 	}
 	if filter.AvgAnnualSalary != nil {
 		avgAnnualSalary = *filter.AvgAnnualSalary

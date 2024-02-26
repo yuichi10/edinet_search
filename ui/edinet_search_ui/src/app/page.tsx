@@ -22,7 +22,7 @@ type Companies = {
 export default function Home() {
   const [companies, setCompanies] = useState<Company[]>([]);
 
-  const client = new GraphQLClient('http://localhost:8080/query')
+  const client = new GraphQLClient('http://localhost:8080/api/query')
   const query = `
     query SearchCompanies($filerName: String!) {
       Companies(filter: {filerName: $filerName}) {

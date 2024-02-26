@@ -1,6 +1,8 @@
 package api
 
 import (
+	"embed"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -18,7 +20,16 @@ import (
 
 const defaultPort = "8080"
 
+//go:embed out/*
+var uiEmbedStaticFiles embed.FS
+
 func runServer() {
+	// 'out' ディレクトリの内容をサブディレクトリとして取得
+	uiStaticFiles, _ := fs.Sub(uiEmbedStaticFiles, "out")
+	uiFS := http.FileServer(http.FS(uiStaticFiles))
+	nextStaticFiles, _ := fs.Sub(uiEmbedStaticFiles, "out/_next/static")
+	nextStaticFS := http.FileServer(http.FS(nextStaticFiles))
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = defaultPort
@@ -27,7 +38,7 @@ func runServer() {
 	router := chi.NewRouter()
 
 	router.Use(cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:3000"},
+		AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:8080"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
@@ -44,8 +55,10 @@ func runServer() {
 		},
 	})
 
-	router.Handle("/", playground.Handler("GraphQL playground", "/query"))
-	router.Handle("/query", srv)
+	router.Handle("/api", playground.Handler("GraphQL playground", "/query"))
+	router.Handle("/api/query", srv)
+	router.Handle("/", uiFS)
+	router.Handle("/_next/static/*", http.StripPrefix("/_next/static/", nextStaticFS)) // _next/static以下のファイルの配信
 
 	log.Printf("connect to http://0.0.0.0:%s/ for GraphQL playground", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))

@@ -26,3 +26,5 @@ edinet
 XBRL_TO_CSV*
 company.db
 *.db
+cmd/api/.next/
+cmd/api/out/
