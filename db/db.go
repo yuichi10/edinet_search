@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"golang.org/x/text/width"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -58,14 +59,15 @@ func InsertCompanies(d Companies) error {
 	return nil
 }
 
-func GetCompanies(filerNames string, salary string) ([]Companies, error) {
+func GetCompanies(filerName string, salary string) ([]Companies, error) {
 	var docs []Companies
 
 	query := db.Model(&Companies{})
 	setWhere := false
-	if filerNames != "" {
+	if filerName != "" {
 		if !setWhere {
-			query.Where("filer_name LIKE ?", fmt.Sprintf("%%%s%%", filerNames))
+			query.Where("filer_name LIKE ?", fmt.Sprintf("%%%s%%", filerName))
+			query.Or("filer_name LIKE ?", fmt.Sprintf("%%%s%%", width.Widen.String(filerName))) // e.g. ＩＮＰＥＸ
 			setWhere = true
 		}
 	}

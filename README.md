@@ -27,7 +27,7 @@ v2のAPIを使っている。
 
 ```bash
 cd ui/edinet_search_ui
-npm build
+npm run build
 ```
 
 その後バイナリ生成
